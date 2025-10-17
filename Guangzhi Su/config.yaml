@@ -1,0 +1,46 @@
+# Configuration file for CNN Scene Classification Project
+
+# Data configuration
+data:
+  data_dir: "/home/gs285/HW/AIPI/Proj_1/SUN397/a"
+  batch_size: 32
+  num_workers: 4
+  train_ratio: 0.7
+  val_ratio: 0.1
+  test_ratio: 0.2
+
+# Model configuration
+model:
+  num_classes: 20
+  pretrained: true
+  freeze_backbone: true
+  classifier_hidden_size: 1024
+  dropout_rate: 0.5
+
+# Training configuration
+training:
+  num_epochs: 10
+  learning_rate: 0.01
+  momentum: 0.9
+  weight_decay: 1e-4
+  nesterov: true
+  scheduler:
+    step_size: 3
+    gamma: 0.7
+
+# Paths
+paths:
+  save_dir: "/home/gs285/HW/AIPI/Proj_1/codeOnA"
+  dropout_save_dir: "/home/gs285/HW/AIPI/Proj_1/Dropout"
+  activation_save_dir: "/home/gs285/HW/AIPI/Proj_1/Activation"
+
+# Logging
+logging:
+  level: "INFO"
+  save_logs: true
+
+# Early stopping
+early_stopping:
+  patience: 5
+  min_delta: 0.001
+  enabled: false

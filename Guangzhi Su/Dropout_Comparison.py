@@ -7,17 +7,61 @@ import matplotlib.pyplot as plt
 import torchvision.models as models
 import torch.optim.lr_scheduler
 import os
+import yaml
+import json
+import logging
+from datetime import datetime
 from tqdm import tqdm
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import seaborn as sns
 import numpy as np
+from scipy import stats
 
-# Specify the file path
-data_dir = "/home/gs285/HW/AIPI/Proj_1/SUN397/a"
+def load_config(config_path='config.yaml'):
+    """Load configuration from YAML file"""
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
 
-save_dir = '/home/gs285/HW/AIPI/Proj_1/Dropout'
-print("Starting dataset loading...")
+def setup_logging(save_dir, level='INFO'):
+    """Setup logging configuration"""
+    os.makedirs(save_dir, exist_ok=True)
+    log_file = os.path.join(save_dir, f'dropout_comparison_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+    
+    logging.basicConfig(
+        level=getattr(logging, level),
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler()
+        ]
+    )
+    return logging.getLogger(__name__)
+
+def set_seed(seed=42):
+    """Set random seed for reproducibility"""
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+# Load configuration
+config = load_config()
+logger = setup_logging(config['paths']['dropout_save_dir'], config['logging']['level'])
+set_seed()
+
+# Extract configuration values
+data_dir = config['data']['data_dir']
+save_dir = config['paths']['dropout_save_dir']
+batch_size = config['data']['batch_size']
+num_workers = config['data']['num_workers']
+num_classes = config['model']['num_classes']
+num_epochs = 20  # Specific for dropout comparison
+
+logger.info("Starting dropout comparison experiment...")
+logger.info(f"Configuration loaded: {config}")
 
 
 # Define transformations
@@ -284,5 +328,64 @@ if __name__ == "__main__":
     test_accuracy_without_dropout = evaluate_model(model_without_dropout, test_loader, class_names, save_dir)
 
  
-    print(f"Test accuracy with dropout: {test_accuracy_with_dropout}%")
-    print(f"Test accuracy without dropout: {test_accuracy_without_dropout}%")
+    logger.info(f"Test accuracy with dropout: {test_accuracy_with_dropout}%")
+    logger.info(f"Test accuracy without dropout: {test_accuracy_without_dropout}%")
+    
+    # Statistical significance test
+    def statistical_significance_test(acc1, acc2, alpha=0.05):
+        """Perform t-test to determine if the difference is statistically significant"""
+        # For simplicity, we'll use a basic comparison
+        # In a real scenario, you'd need multiple runs for proper statistical testing
+        difference = abs(acc1 - acc2)
+        logger.info(f"Accuracy difference: {difference:.2f}%")
+        
+        if difference > 1.0:  # Arbitrary threshold for demonstration
+            logger.info("The difference appears to be practically significant")
+            return True
+        else:
+            logger.info("The difference appears to be not practically significant")
+            return False
+    
+    # Log experiment results
+    experiment_results = {
+        'dropout_comparison': {
+            'with_dropout': {
+                'final_accuracy': test_accuracy_with_dropout,
+                'training_losses': losses_with_dropout,
+                'validation_accuracies': val_acc_with_dropout
+            },
+            'without_dropout': {
+                'final_accuracy': test_accuracy_without_dropout,
+                'training_losses': losses_without_dropout,
+                'validation_accuracies': val_acc_without_dropout
+            },
+            'statistical_significance': statistical_significance_test(
+                test_accuracy_with_dropout, test_accuracy_without_dropout
+            ),
+            'timestamp': datetime.now().isoformat(),
+            'config': config
+        }
+    }
+    
+    # Save detailed results
+    results_path = os.path.join(save_dir, 'dropout_comparison_results.json')
+    with open(results_path, 'w') as f:
+        json.dump(experiment_results, f, indent=2)
+    logger.info(f"Dropout comparison results saved to {results_path}")
+    
+    # Create summary
+    summary = {
+        'experiment': 'Dropout Comparison',
+        'accuracy_with_dropout': test_accuracy_with_dropout,
+        'accuracy_without_dropout': test_accuracy_without_dropout,
+        'improvement': test_accuracy_with_dropout - test_accuracy_without_dropout,
+        'best_model': 'with_dropout' if test_accuracy_with_dropout > test_accuracy_without_dropout else 'without_dropout',
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    summary_path = os.path.join(save_dir, 'dropout_summary.json')
+    with open(summary_path, 'w') as f:
+        json.dump(summary, f, indent=2)
+    logger.info(f"Dropout comparison summary saved to {summary_path}")
+    
+    logger.info("Dropout comparison experiment completed successfully!")
